@@ -22,6 +22,7 @@ const VideoUpload = () => {
     const [status, setStatus] = useState('idle');
     const [fact, setFact] = useState('');
     const [analysisPercent, setAnalysisPercent] = useState(0);
+    const [analysisStatus, setAnalysisStatus] = useState('');
     const [jobId, setJobId] = useState(null);
     const [filename, setFilename] = useState(null);
     const [outputFilename, setOutputFilename] = useState(null);
@@ -51,6 +52,7 @@ const VideoUpload = () => {
                 const { data } = await axios.get(url, { params: { job_id: jobId } });
                 setAnalysisPercent(data.percent ?? 0);
                 setOutputReady(data.output_ready ?? false);
+                if (data.status) setAnalysisStatus(data.status);
             } catch {
                 setAnalysisPercent(0);
             }
@@ -76,6 +78,7 @@ const VideoUpload = () => {
         setStatus('uploading');
         setProgress(0);
         setAnalysisPercent(0);
+        setAnalysisStatus('');
         setOutputReady(false);
 
         try {
@@ -129,7 +132,7 @@ const VideoUpload = () => {
                                 <CheckCircle className="w-20 h-20 text-green-500 mb-4 mx-auto" />
                                 <h2 className="text-2xl font-bold text-slate-800">Upload Complete!</h2>
                                 <p className="text-slate-500 mb-4">
-                                    {outputReady ? 'AI analysis complete!' : 'AI analysis in progress...'}
+                                    {outputReady ? 'AI analysis complete!' : (analysisStatus ? `${analysisStatus.replace(/_/g, ' ')}...` : 'AI analysis in progress...')}
                                 </p>
 
                                 {/* Analysis progress bar */}
@@ -140,8 +143,8 @@ const VideoUpload = () => {
                                     </div>
                                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                                         <div
-                                            className="h-full bg-emerald-500 transition-all duration-500"
-                                            style={{ width: `${Math.min(analysisPercent, 100)}%` }}
+                                            className={`h-full bg-emerald-500 transition-all duration-500 ${analysisPercent === 0 && !outputReady ? 'indeterminate-progress' : ''}`}
+                                            style={{ width: analysisPercent === 0 && !outputReady ? '40%' : `${Math.min(analysisPercent, 100)}%` }}
                                         />
                                     </div>
                                 </div>

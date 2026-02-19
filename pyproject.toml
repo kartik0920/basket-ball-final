@@ -5,10 +5,14 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
+    "annotated-doc==0.0.4",
     "fastapi>=0.129.0",
     "ipykernel>=7.2.0",
     "numpy>=2.4.2",
     "pandas>=3.0.0",
     "python-multipart>=0.0.22",
+    "supervision>=0.27.0.post1",
+    "transformers>=5.2.0",
+    "ultralytics>=8.4.14",
     "uvicorn>=0.40.0",
 ]
