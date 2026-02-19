@@ -52,6 +52,38 @@ BASKETBALL_FACTS = [
 ]
 
 
+def _reencode_for_web(input_path: str) -> bool:
+    """Re-encode video to H.264 for browser compatibility (mp4v from OpenCV often won't play)."""
+    if not os.path.isfile(input_path):
+        return False
+    tmp_path = input_path + ".tmp.mp4"
+    try:
+        result = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", input_path,
+                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                "-movflags", "+faststart",  # web-friendly: metadata at start
+                tmp_path,
+            ],
+            capture_output=True,
+            timeout=3600,
+        )
+        if result.returncode == 0 and os.path.isfile(tmp_path):
+            os.replace(tmp_path, input_path)
+            print(f"✅ Re-encoded to H.264 for web playback")
+            return True
+    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
+        print(f"⚠️ ffmpeg not available or timeout: {e}")
+    except Exception as e:
+        print(f"⚠️ Re-encode failed: {e}")
+    if os.path.isfile(tmp_path):
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+    return False
+
+
 def run_ball_tracking_analysis(
     uploaded_path: str,
     output_path: str,
@@ -79,9 +111,18 @@ def run_ball_tracking_analysis(
     try:
         print(f"🏀 Starting Team Scoring System analysis: {abs_upload} -> {abs_output}")
         subprocess.run(cmd, cwd=BASKETBALL_FINAL_DIR, check=False)
+        if os.path.isfile(abs_output):
+            _reencode_for_web(abs_output)
         print(f"✅ Team scoring analysis finished: {abs_output}")
     except Exception as e:
         print(f"❌ Ball tracking error: {e}")
+
+
+@app.get("/api")
+@app.get("/api/")
+def api_root():
+    """API root / health check."""
+    return {"message": "Basketball Analysis API", "status": "ok"}
 
 
 @app.get("/basketball-facts")
@@ -181,6 +222,7 @@ def serve_analyzed_video(filename: str):
 
 @app.get("/")
 def root():
+    """Root welcome message."""
     return "Welcome to skillzo"
 
 

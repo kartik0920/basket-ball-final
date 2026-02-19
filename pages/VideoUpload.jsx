@@ -165,7 +165,7 @@ const VideoUpload = () => {
 
     const videoBaseUrl = API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
     const originalVideoUrl = filename ? `${videoBaseUrl}/api/videos/original/${encodeURIComponent(filename)}` : null;
-    const analyzedVideoUrl = outputFilename ? `${videoBaseUrl}/api/videos/analyzed/${encodeURIComponent(outputFilename)}` : null;
+    const analyzedVideoUrl = outputFilename ? `${videoBaseUrl}/api/videos/analyzed/${outputFilename}` : null;
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -239,6 +239,10 @@ const VideoUpload = () => {
                                                     controls
                                                     className="w-full h-full object-contain"
                                                     playsInline
+                                                    preload="metadata"
+                                                    onError={(e) => {
+                                                        console.error('Analyzed video failed to load:', analyzedVideoUrl, e);
+                                                    }}
                                                 />
                                             ) : (
                                                 <p className="text-slate-400 text-sm">Analysis in progress...</p>
