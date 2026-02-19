@@ -4,8 +4,24 @@ import { Upload, CheckCircle, Film, Play, ArrowLeft, Video } from 'lucide-react'
 
 const FACT_ROTATE_MS = 15000;
 const PROGRESS_POLL_MS = 1500;
-const STORAGE_KEY = 'basketball_last_job';
+const STORAGE_KEY_JOBS = 'basketball_jobs';
 const API_BASE = ''; // use proxy; e.g. 'http://localhost:8000' if no proxy
+
+const getStoredJobs = () => {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY_JOBS);
+        if (stored) return JSON.parse(stored);
+        const legacy = localStorage.getItem('basketball_last_job');
+        if (legacy) {
+            const data = JSON.parse(legacy);
+            const jobs = [{ jobId: data.jobId, filename: data.filename, outputFilename: data.outputFilename || `${data.jobId}/a.mp4` }];
+            localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(jobs));
+            localStorage.removeItem('basketball_last_job');
+            return jobs;
+        }
+    } catch (_) { }
+    return [];
+};
 
 const fetchBasketballFact = async () => {
     try {
@@ -28,30 +44,51 @@ const VideoUpload = () => {
     const [filename, setFilename] = useState(null);
     const [outputFilename, setOutputFilename] = useState(null);
     const [outputReady, setOutputReady] = useState(false);
+    const [showAllVideos, setShowAllVideos] = useState(false);
+    const [allJobs, setAllJobs] = useState([]);
     const fileInputRef = useRef(null);
+    const dropdownRef = useRef(null);
 
-    // Restore state from localStorage on mount (survives refresh)
     useEffect(() => {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const data = JSON.parse(stored);
-                setStatus('success');
-                setJobId(data.jobId);
-                setFilename(data.filename);
-                setOutputFilename(data.outputFilename || `${data.jobId}/a.mp4`);
-            }
-        } catch (_) { }
+        if (!showAllVideos) return;
+        const close = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowAllVideos(false);
+        };
+        document.addEventListener('click', close);
+        return () => document.removeEventListener('click', close);
+    }, [showAllVideos]);
+
+    // Load jobs from localStorage on mount
+    useEffect(() => {
+        setAllJobs(getStoredJobs());
     }, []);
 
-    // Save state to localStorage when we have a successful job
+    // Restore most recent job on mount (survives refresh)
+    useEffect(() => {
+        const jobs = getStoredJobs();
+        if (jobs.length > 0 && status === 'idle') {
+            const latest = jobs[0];
+            setStatus('success');
+            setJobId(latest.jobId);
+            setFilename(latest.filename);
+            setOutputFilename(latest.outputFilename || `${latest.jobId}/a.mp4`);
+        }
+    }, []);
+
+    // Save job to list when we have a successful upload
     useEffect(() => {
         if (status === 'success' && jobId && filename) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            const newJob = {
                 jobId,
                 filename,
                 outputFilename: outputFilename || `${jobId}/a.mp4`,
-            }));
+            };
+            setAllJobs((prev) => {
+                const filtered = prev.filter((j) => j.jobId !== jobId);
+                const updated = [newJob, ...filtered];
+                localStorage.setItem(STORAGE_KEY_JOBS, JSON.stringify(updated));
+                return updated;
+            });
         }
     }, [status, jobId, filename, outputFilename]);
 
@@ -67,17 +104,14 @@ const VideoUpload = () => {
         setOutputReady(false);
     };
 
-    const viewUploadedVideo = () => {
-        try {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                const data = JSON.parse(stored);
-                setStatus('success');
-                setJobId(data.jobId);
-                setFilename(data.filename);
-                setOutputFilename(data.outputFilename || `${data.jobId}/a.mp4`);
-            }
-        } catch (_) { }
+    const selectJob = (job) => {
+        setStatus('success');
+        setJobId(job.jobId);
+        setFilename(job.filename);
+        setOutputFilename(job.outputFilename || `${job.jobId}/a.mp4`);
+        setOutputReady(false);
+        setAnalysisPercent(0);
+        setShowAllVideos(false);
     };
 
     // Show and rotate basketball facts during upload or post-upload wait
@@ -176,7 +210,7 @@ const VideoUpload = () => {
 
                         {status === 'success' ? (
                             <div className="text-center w-full">
-                                <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                                     <button
                                         onClick={goBackToUpload}
                                         className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 font-medium"
@@ -184,6 +218,32 @@ const VideoUpload = () => {
                                         <ArrowLeft className="w-5 h-5" />
                                         Upload Another Video
                                     </button>
+                                    {allJobs.length > 1 && (
+                                        <div className="relative" ref={dropdownRef}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowAllVideos(!showAllVideos)}
+                                                className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 font-medium"
+                                            >
+                                                <Video className="w-5 h-5" />
+                                                Switch video ({allJobs.length})
+                                            </button>
+                                            {showAllVideos && (
+                                                <div className="absolute right-0 top-full mt-1 min-w-[280px] max-h-60 overflow-y-auto bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-10">
+                                                    {allJobs.map((job) => (
+                                                        <button
+                                                            key={job.jobId}
+                                                            type="button"
+                                                            onClick={() => selectJob(job)}
+                                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 text-slate-700 font-medium truncate"
+                                                        >
+                                                            {job.filename || job.jobId}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <CheckCircle className="w-20 h-20 text-green-500 mb-4 mx-auto" />
                                 <h2 className="text-2xl font-bold text-slate-800">Upload Complete!</h2>
@@ -294,16 +354,32 @@ const VideoUpload = () => {
                                     >
                                         {status === 'uploading' ? 'Please Wait...' : 'Select Video File'}
                                     </button>
-                                    {typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEY) && (
-                                        <button
-                                            type="button"
-                                            disabled={status === 'uploading'}
-                                            onClick={viewUploadedVideo}
-                                            className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-4 px-6 rounded-xl border border-slate-200 disabled:opacity-50"
-                                        >
-                                            <Video className="w-5 h-5" />
-                                            View uploaded video
-                                        </button>
+                                    {allJobs.length > 0 && (
+                                        <div className="relative" ref={dropdownRef}>
+                                            <button
+                                                type="button"
+                                                disabled={status === 'uploading'}
+                                                onClick={() => setShowAllVideos(!showAllVideos)}
+                                                className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-4 px-6 rounded-xl border border-slate-200 disabled:opacity-50"
+                                            >
+                                                <Video className="w-5 h-5" />
+                                                View all uploads ({allJobs.length})
+                                            </button>
+                                            {showAllVideos && (
+                                                <div className="absolute top-full left-0 mt-1 min-w-[280px] max-h-60 overflow-y-auto bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-10">
+                                                    {allJobs.map((job) => (
+                                                        <button
+                                                            key={job.jobId}
+                                                            type="button"
+                                                            onClick={() => selectJob(job)}
+                                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 text-slate-700 font-medium truncate"
+                                                        >
+                                                            {job.filename || job.jobId}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             </>
