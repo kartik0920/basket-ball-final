@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Upload, CheckCircle, Film, Play } from 'lucide-react';
+import { Upload, CheckCircle, Film, Play, ArrowLeft, Video } from 'lucide-react';
 
 const FACT_ROTATE_MS = 15000;
 const PROGRESS_POLL_MS = 1500;
+const STORAGE_KEY = 'basketball_last_job';
 const API_BASE = ''; // use proxy; e.g. 'http://localhost:8000' if no proxy
 
 const fetchBasketballFact = async () => {
@@ -28,6 +29,56 @@ const VideoUpload = () => {
     const [outputFilename, setOutputFilename] = useState(null);
     const [outputReady, setOutputReady] = useState(false);
     const fileInputRef = useRef(null);
+
+    // Restore state from localStorage on mount (survives refresh)
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                const data = JSON.parse(stored);
+                setStatus('success');
+                setJobId(data.jobId);
+                setFilename(data.filename);
+                setOutputFilename(data.outputFilename || `${data.jobId}/a.mp4`);
+            }
+        } catch (_) { }
+    }, []);
+
+    // Save state to localStorage when we have a successful job
+    useEffect(() => {
+        if (status === 'success' && jobId && filename) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                jobId,
+                filename,
+                outputFilename: outputFilename || `${jobId}/a.mp4`,
+            }));
+        }
+    }, [status, jobId, filename, outputFilename]);
+
+    const goBackToUpload = () => {
+        setStatus('idle');
+        setFile(null);
+        setProgress(0);
+        setAnalysisPercent(0);
+        setAnalysisStatus('');
+        setJobId(null);
+        setFilename(null);
+        setOutputFilename(null);
+        setOutputReady(false);
+    };
+
+    const viewUploadedVideo = () => {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                const data = JSON.parse(stored);
+                setStatus('success');
+                setJobId(data.jobId);
+                setFilename(data.filename);
+                setOutputFilename(data.outputFilename || `${data.jobId}/a.mp4`);
+            }
+        } catch (_) { }
+    };
 
     // Show and rotate basketball facts during upload or post-upload wait
     useEffect(() => {
@@ -96,7 +147,7 @@ const VideoUpload = () => {
             setStatus('success');
             setJobId(response.data.job_id);
             setFilename(response.data.filename);
-            setOutputFilename(response.data.output_filename || `${response.data.job_id}_analyzed.avi`);
+            setOutputFilename(response.data.output_filename || `${response.data.job_id}/a.mp4`);
             console.log('Upload successful:', response.data);
         } catch (error) {
             console.error("Upload failed:", error);
@@ -113,12 +164,8 @@ const VideoUpload = () => {
     };
 
     const videoBaseUrl = API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
-    const openOriginalVideo = () => {
-        if (filename) window.open(`${videoBaseUrl}/api/videos/original/${encodeURIComponent(filename)}`, '_blank');
-    };
-    const openAnalyzedVideo = () => {
-        if (outputFilename) window.open(`${videoBaseUrl}/api/videos/analyzed/${encodeURIComponent(outputFilename)}`, '_blank');
-    };
+    const originalVideoUrl = filename ? `${videoBaseUrl}/api/videos/original/${encodeURIComponent(filename)}` : null;
+    const analyzedVideoUrl = outputFilename ? `${videoBaseUrl}/api/videos/analyzed/${encodeURIComponent(outputFilename)}` : null;
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -129,6 +176,15 @@ const VideoUpload = () => {
 
                         {status === 'success' ? (
                             <div className="text-center w-full">
+                                <div className="flex items-center justify-between mb-4">
+                                    <button
+                                        onClick={goBackToUpload}
+                                        className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-800 font-medium"
+                                    >
+                                        <ArrowLeft className="w-5 h-5" />
+                                        Upload Another Video
+                                    </button>
+                                </div>
                                 <CheckCircle className="w-20 h-20 text-green-500 mb-4 mx-auto" />
                                 <h2 className="text-2xl font-bold text-slate-800">Upload Complete!</h2>
                                 <p className="text-slate-500 mb-4">
@@ -149,23 +205,46 @@ const VideoUpload = () => {
                                     </div>
                                 </div>
 
-                                {/* View Videos buttons */}
-                                <div className="flex flex-wrap gap-3 justify-center mb-6">
-                                    <button
-                                        onClick={openOriginalVideo}
-                                        className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-2.5 px-5 rounded-xl transition-colors"
-                                    >
-                                        <Film className="w-4 h-4" />
-                                        View Original Video
-                                    </button>
-                                    <button
-                                        onClick={openAnalyzedVideo}
-                                        disabled={!outputReady}
-                                        className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 px-5 rounded-xl transition-colors"
-                                    >
-                                        <Play className="w-4 h-4" />
-                                        {outputReady ? 'View Analyzed Video' : 'Analyzing...'}
-                                    </button>
+                                {/* Video cards - embedded on page */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                    {/* Original video card */}
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <div className="px-4 py-2 bg-slate-100 flex items-center gap-2">
+                                            <Film className="w-4 h-4 text-slate-600" />
+                                            <span className="font-semibold text-slate-700">Original Video</span>
+                                        </div>
+                                        <div className="aspect-video bg-black">
+                                            {originalVideoUrl && (
+                                                <video
+                                                    src={originalVideoUrl}
+                                                    controls
+                                                    className="w-full h-full object-contain"
+                                                    playsInline
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* Analyzed video card */}
+                                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                                        <div className="px-4 py-2 bg-violet-100 flex items-center gap-2">
+                                            <Play className="w-4 h-4 text-violet-600" />
+                                            <span className="font-semibold text-violet-700">
+                                                {outputReady ? 'Analyzed Video' : 'Analyzed Video (processing...)'}
+                                            </span>
+                                        </div>
+                                        <div className="aspect-video bg-black flex items-center justify-center">
+                                            {outputReady && analyzedVideoUrl ? (
+                                                <video
+                                                    src={analyzedVideoUrl}
+                                                    controls
+                                                    className="w-full h-full object-contain"
+                                                    playsInline
+                                                />
+                                            ) : (
+                                                <p className="text-slate-400 text-sm">Analysis in progress...</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {fact && (
@@ -203,13 +282,26 @@ const VideoUpload = () => {
 
                                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="video/*" />
 
-                                <button
-                                    disabled={status === 'uploading'}
-                                    onClick={() => fileInputRef.current.click()}
-                                    className="bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold py-4 px-12 rounded-xl shadow-lg disabled:opacity-50"
-                                >
-                                    {status === 'uploading' ? 'Please Wait...' : 'Select Video File'}
-                                </button>
+                                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                                    <button
+                                        disabled={status === 'uploading'}
+                                        onClick={() => fileInputRef.current.click()}
+                                        className="bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold py-4 px-12 rounded-xl shadow-lg disabled:opacity-50"
+                                    >
+                                        {status === 'uploading' ? 'Please Wait...' : 'Select Video File'}
+                                    </button>
+                                    {typeof window !== 'undefined' && localStorage.getItem(STORAGE_KEY) && (
+                                        <button
+                                            type="button"
+                                            disabled={status === 'uploading'}
+                                            onClick={viewUploadedVideo}
+                                            className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold py-4 px-6 rounded-xl border border-slate-200 disabled:opacity-50"
+                                        >
+                                            <Video className="w-5 h-5" />
+                                            View uploaded video
+                                        </button>
+                                    )}
+                                </div>
                             </>
                         )}
                     </div>

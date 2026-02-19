@@ -57,7 +57,7 @@ def run_ball_tracking_analysis(
     output_path: str,
     progress_file_path: str,
 ) -> None:
-    """Run basketball-final's Advanced Ball Tracking in the background."""
+    """Run basketball-final's Team Scoring System analysis in the background."""
     if not os.path.isdir(BASKETBALL_FINAL_DIR):
         print(f"⚠️ basketball-final not found at {BASKETBALL_FINAL_DIR}; skipping analysis.")
         return
@@ -74,11 +74,12 @@ def run_ball_tracking_analysis(
         "--video", abs_upload,
         "--output", abs_output,
         "--progress-file", abs_progress,
+        "--mode", "team-scoring",
     ]
     try:
-        print(f"🏀 Starting Advanced Ball Tracking: {abs_upload} -> {abs_output}")
+        print(f"🏀 Starting Team Scoring System analysis: {abs_upload} -> {abs_output}")
         subprocess.run(cmd, cwd=BASKETBALL_FINAL_DIR, check=False)
-        print(f"✅ Ball tracking finished: {abs_output}")
+        print(f"✅ Team scoring analysis finished: {abs_output}")
     except Exception as e:
         print(f"❌ Ball tracking error: {e}")
 
@@ -108,14 +109,14 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
     finally:
         file.file.close()
 
-    # Schedule Advanced Ball Tracking (basketball-final) after upload
-    # Create subfolder per video: output_videos/{base_name}/a.avi and progress.json
+    # Schedule Team Scoring System analysis (basketball-final) after upload
+    # Create subfolder per video: output_videos/{base_name}/a.mp4 and progress.json
     base_name = os.path.splitext(file.filename)[0]
     job_dir = os.path.join(OUTPUT_DIR, base_name)
     os.makedirs(job_dir, exist_ok=True)
-    output_path = os.path.join(job_dir, "a.avi")
+    output_path = os.path.join(job_dir, "a.mp4")
     progress_file_path = os.path.join(job_dir, "progress.json")
-    output_filename = f"{base_name}/a.avi"
+    output_filename = f"{base_name}/a.mp4"
     background_tasks.add_task(
         run_ball_tracking_analysis,
         file_path,
@@ -144,7 +145,7 @@ def get_analysis_progress(job_id: str):
     try:
         with open(progress_path, "r") as f:
             data = json.load(f)
-        output_path = os.path.join(OUTPUT_DIR, job_id, "a.avi")
+        output_path = os.path.join(OUTPUT_DIR, job_id, "a.mp4")
         output_ready = data.get("percent", 0) >= 100 and os.path.isfile(output_path)
         return {
             "percent": data.get("percent", 0),
@@ -168,14 +169,14 @@ def serve_original_video(filename: str):
 @app.get("/videos/analyzed/{filename:path}")
 @app.get("/api/videos/analyzed/{filename:path}")
 def serve_analyzed_video(filename: str):
-    """Serve the analyzed (ball-tracking) video file. Filename format: {job_id}/a.avi"""
+    """Serve the analyzed (ball-tracking) video file. Filename format: {job_id}/a.mp4"""
     path = os.path.join(OUTPUT_DIR, filename)
     # Prevent path traversal
     if not os.path.realpath(path).startswith(os.path.realpath(OUTPUT_DIR)):
         raise HTTPException(status_code=403, detail="Invalid path")
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Video not found")
-    return FileResponse(path, media_type="video/x-msvideo")
+    return FileResponse(path, media_type="video/mp4")
 
 
 @app.get("/")
