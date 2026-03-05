@@ -1,0 +1,22 @@
+[Unit]
+Description=Basketball Analysis FastAPI
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/basket-ball-final
+ExecStart=/home/ec2-user/.local/bin/uv run python main.py
+Restart=always
+RestartSec=5
+
+# Ensure uv and Python tools are in PATH
+Environment=PATH=/home/ec2-user/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
