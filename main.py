@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 # basketball-final location: Advanced Ball Tracking runs from here
-BASKETBALL_FINAL_DIR = r"D:\Study\skillzo-ec2\Temp\basketball-final"
+BASKETBALL_FINAL_DIR = r"../LiveTracking1"
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(_BASE_DIR, "uploads")
 OUTPUT_DIR = os.path.join(_BASE_DIR, "output_videos")
